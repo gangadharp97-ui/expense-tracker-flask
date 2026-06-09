@@ -11,7 +11,27 @@
 
 <div class="container">
 
-    <h1>💰 Expense Tracker</h1>
+    <!-- ⚡ HIGH-FIDELITY HEADER ROW WITH SECURE LOGOUT UTILITY -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 15px;">
+        <h1 style="margin: 0;">💰 Expense Tracker</h1>
+        
+        <a href="/logout" class="btn red" style="
+            padding: 8px 16px; 
+            font-size: 13px; 
+            font-weight: 600; 
+            text-decoration: none; 
+            background: rgba(239, 68, 68, 0.1); 
+            border: 1px solid rgba(239, 68, 68, 0.25); 
+            color: #f87171;
+            border-radius: 8px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s ease;
+            margin: 0;">
+            🔒 Safe Logout
+        </a>
+    </div>
 
     <div class="top-actions" style="margin-bottom: 30px;">
         <a href="/add" class="btn green">➕ Add Expense</a>
