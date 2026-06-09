@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure Login - Expense Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<div class="container" style="max-width: 450px; margin-top: 10vh;">
+
+    <h1 style="text-align: center; margin-bottom: 10px;">🔐 Account Login</h1>
+    <p style="text-align: center; color: #94a3b8; font-size: 14px; margin-bottom: 30px;">
+        Enter your parameters to access your financial dashboard.
+    </p>
+
+    <div class="table-container" style="padding: 30px;">
+        <form action="/login" method="POST" style="display: flex; flex-direction: column; gap: 20px;">
+            
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+                <label style="color: #cbd5e1; font-size: 13px; font-weight: 600;">Username</label>
+                <input type="text" name="username" placeholder="e.g., alex_dev" required autocomplete="off">
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+                <label style="color: #cbd5e1; font-size: 13px; font-weight: 600;">Password</label>
+                <input type="password" name="password" placeholder="••••••••" required>
+            </div>
+
+            <button type="submit" class="btn green" style="width: 100%; padding: 12px; margin-top: 10px; font-weight: 600;">
+                Sign In Safely →
+            </button>
+        </form>
+    </div>
+
+    <div style="text-align: center; margin-top: 20px;">
+        <span style="color: #94a3b8; font-size: 14px;">New to the tracker?</span>
+        <a href="/register" style="color: #a78bfa; text-decoration: none; font-size: 14px; font-weight: 600; margin-left: 5px;">
+            Create an Account
+        </a>
+    </div>
+
+</div>
+
+</body>
+</html>

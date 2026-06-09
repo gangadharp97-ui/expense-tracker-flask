@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upcoming Expenses</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<div class="container">
+
+    <h1>📅 Upcoming Expenses</h1>
+
+    <div class="top-actions">
+        <a href="/" class="btn red">← Dashboard</a>
+        <a href="/add-reminder" class="btn green">➕ Add Reminder</a>
+    </div>
+
+    <div class="table-container" style="width: 100%; margin-top: 20px;">
+        <h3>🧾 Scheduled Commitments & Bills</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Title</th>
+                    <th>Amount</th>
+                    <th>Due Date</th>
+                    <th style="text-align: center;">Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in reminders %}
+                <tr>
+                    <td style="font-weight: 600;">{{ r[0] }}</td>
+                    <td>₹{{ "%.2f"|format(r[1]|float) }}</td>
+                    <td style="color: #94a3b8;">{{ r[2] }}</td>
+                    <td style="text-align: center;">
+                        <span class="badge {{ r[4] }}">
+                            {{ r[3] }}
+                        </span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+</div> </body>
+</html>

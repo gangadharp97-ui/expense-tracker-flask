@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Expenses</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<div class="container">
+
+    <h1>📋 Expense Ledger</h1>
+
+    <div class="top-actions">
+        <a href="/" class="btn green">← Dashboard</a>
+        <a href="/add" class="btn">➕ Add Expense</a>
+    </div>
+
+    <div class="card" style="width: 100%; margin-top: 10px; margin-bottom: 20px;">
+        <h3 style="margin-bottom: 15px;">🔍 Filter & Sort Parameters</h3>
+        
+        <div style="display: flex; gap: 15px; flex-wrap: wrap; width: 100%;">
+            
+            <div style="flex: 2; min-width: 200px; display: flex; flex-direction: column; gap: 6px;">
+                <input type="text" id="searchInput" placeholder="Search by expense name..." style="width: 100%;" oninput="processLedgerEngine()">
+            </div>
+
+            <div style="flex: 1; min-width: 150px; display: flex; flex-direction: column; gap: 6px;">
+                <select id="categoryFilter" style="width: 100%;" onchange="processLedgerEngine()">
+                    <option value="all">All Categories</option>
+                    {% for c in categories %}
+                    <option value="{{ c }}">{{ c }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div style="flex: 1; min-width: 180px; display: flex; flex-direction: column; gap: 6px;">
+                <select id="sortEngine" style="width: 100%;" onchange="processLedgerEngine()">
+                    <option value="date-desc">Sort by: Latest Date</option>
+                    <option value="date-asc">Sort by: Oldest Date</option>
+                    <option value="amount-desc">Sort by: Amount (High → Low)</option>
+                    <option value="amount-asc">Sort by: Amount (Low → High)</option>
+                </select>
+            </div>
+
+        </div>
+    </div>
+
+    <div class="table-container" style="width: 100%;">
+        <h3>🧾 All Recorded Transactions</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Description</th>
+                    <th>Amount</th>
+                    <th>Category</th>
+                    <th>Date</th>
+                    <th style="text-align: center;">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="ledgerTableBody">
+                </tbody>
+        </table>
+    </div>
+
+</div>
+
+<script>
+// 1. Securely parse the backend raw array into JavaScript objects
+const masterLedger = [
+    {% for index, row in expenses %}
+    {
+        index: {{ index }},
+        name: {{ row[0] | tojson }},
+        amount: parseFloat({{ row[1] }}),
+        category: {{ row[2] | tojson }},
+        date: {{ row[3] | tojson }}
+    },
+    {% endfor %}
+];
+
+// 2. The Core Engine that processes filters, sorting, and UI population
+function processLedgerEngine() {
+    const searchQuery = document.getElementById('searchInput').value.toLowerCase().trim();
+    const selectedCategory = document.getElementById('categoryFilter').value;
+    const sortingStrategy = document.getElementById('sortEngine').value;
+    const tableBody = document.getElementById('ledgerTableBody');
+
+    // FILTER STEP
+    let filteredData = masterLedger.filter(item => {
+        const matchesSearch = item.name.toLowerCase().includes(searchQuery);
+        const matchesCategory = (selectedCategory === 'all' || item.category === selectedCategory);
+        return matchesSearch && matchesCategory;
+    });
+
+    // SORT STEP
+    if (sortingStrategy === 'amount-desc') {
+        filteredData.sort((a, b) => b.amount - a.amount);
+    } else if (sortingStrategy === 'amount-asc') {
+        filteredData.sort((a, b) => a.amount - b.amount);
+    } else if (sortingStrategy === 'date-desc') {
+        filteredData.sort((a, b) => new Date(b.date) - new Date(a.date));
+    } else if (sortingStrategy === 'date-asc') {
+        filteredData.sort((a, b) => new Date(a.date) - new Date(b.date));
+    }
+
+    // RENDER STEP
+    tableBody.innerHTML = '';
+
+    if (filteredData.length === 0) {
+        tableBody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: #94a3b8; padding: 30px;">No transaction logs matched your criteria.</td></tr>`;
+        return;
+    }
+
+    filteredData.forEach(item => {
+        const rowHTML = `
+            <tr>
+                <td style="font-weight: 600;">${item.name}</td>
+                <td>₹${item.amount.toFixed(2)}</td>
+                <td><span class="badge" style="background: rgba(255,255,255,0.05);">${item.category}</span></td>
+                <td style="color: #94a3b8;">${item.date}</td>
+                <td style="text-align: center;">
+                    <a href="/edit/${item.index}" class="btn" style="padding: 4px 10px; font-size: 12px; margin: 0; background: rgba(167, 139, 250, 0.15);">
+                        ✏️ Edit
+                    </a>
+                </td>
+            </tr>
+        `;
+        tableBody.insertAdjacentHTML('beforeend', rowHTML);
+    });
+}
+
+// Initialize the ledger data array automatically when the page loads
+document.addEventListener('DOMContentLoaded', processLedgerEngine);
+</script>
+
+</body>
+</html>

@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Delete Expense</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<div class="container">
+
+    <h1>🗑 Delete Expense</h1>
+
+    <div class="card" style="width: 100%; max-width: 600px; margin-top: 10px;">
+
+        <form method="POST" style="display: flex; flex-direction: column; gap: 20px;">
+            
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+                <label style="font-size: 13px; font-weight: 600; color: #a78bfa; text-transform: uppercase; letter-spacing: 0.03em;">
+                    Select Transaction to Remove
+                </label>
+                
+                <select name="index" required style="width: 100%; cursor: pointer; padding: 12px 16px;">
+                    {% for i, row in rows %}
+                    <option value="{{ i }}" style="background: #111827; color: #cbd5e1;">
+                        {{ row[0] }} — ₹{{ "%.2f"|format(row[1]|float) }} [{{ row[2] }}] ({{ row[3] }})
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div style="display: flex; gap: 12px; margin-top: 10px; justify-content: flex-end;">
+                <a href="/" class="btn green" style="margin: 0;">← Dashboard</a>
+                <button type="submit" class="btn red" style="margin: 0;">Confirm Delete</button>
+            </div>
+
+        </form>
+
+    </div>
+
+</div>
+
+</body>
+</html>

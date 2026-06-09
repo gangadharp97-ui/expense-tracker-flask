@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Reminder</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<div class="container">
+
+    <h1>📅 Add Reminder</h1>
+
+    <div class="card" style="width: 100%; max-width: 500px; margin-top: 10px;">
+        
+        <form method="POST" style="display: flex; flex-direction: column; gap: 20px;">
+
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+                <label style="font-size: 13px; font-weight: 600; color: #a78bfa; text-transform: uppercase; letter-spacing: 0.03em;">
+                    Reminder Title
+                </label>
+                <input 
+                    type="text"
+                    name="title" 
+                    placeholder="e.g. House Rent, Car EMI, Insurance Bill" 
+                    required
+                    style="width: 100%;"
+                >
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+                <label style="font-size: 13px; font-weight: 600; color: #a78bfa; text-transform: uppercase; letter-spacing: 0.03em;">
+                    Expected Amount (₹)
+                </label>
+                <input 
+                    type="number" 
+                    name="amount" 
+                    placeholder="Enter amount" 
+                    step="0.01"
+                    required
+                    style="width: 100%;"
+                >
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+                <label style="font-size: 13px; font-weight: 600; color: #a78bfa; text-transform: uppercase; letter-spacing: 0.03em;">
+                    Due Date
+                </label>
+                <input 
+                    type="date" 
+                    name="date" 
+                    required
+                    style="width: 100%; font-family: inherit;"
+                >
+            </div>
+
+            <div style="display: flex; gap: 12px; margin-top: 10px; justify-content: flex-end;">
+                <a href="/upcoming" class="btn red" style="margin: 0;">Cancel</a>
+                <button type="submit" class="btn green" style="margin: 0;">Save Reminder</button>
+            </div>
+
+        </form>
+
+    </div>
+
+</div>
+
+</body>
+</html>

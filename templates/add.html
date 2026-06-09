@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Expense</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<div class="container">
+
+    <h1>➕ Add Expense</h1>
+
+    <div class="card" style="width: 100%; max-width: 500px; margin-top: 10px;">
+
+        <form method="POST" style="display: flex; flex-direction: column; gap: 20px;">
+            
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+                <label style="font-size: 13px; font-weight: 600; color: #a78bfa; text-transform: uppercase; letter-spacing: 0.03em;">
+                    Expense Name
+                </label>
+                <input 
+                    type="text"
+                    name="name" 
+                    placeholder="e.g. Starbucks, Electricity Bill, Petrol" 
+                    required
+                    style="width: 100%;"
+                >
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+                <label style="font-size: 13px; font-weight: 600; color: #a78bfa; text-transform: uppercase; letter-spacing: 0.03em;">
+                    Amount (₹)
+                </label>
+                <input 
+                    type="number" 
+                    name="amount" 
+                    placeholder="0.00" 
+                    step="0.01"
+                    required
+                    style="width: 100%;"
+                >
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+                <label style="font-size: 13px; font-weight: 600; color: #a78bfa; text-transform: uppercase; letter-spacing: 0.03em;">
+                    Category
+                </label>
+                <input 
+                    type="text"
+                    name="category" 
+                    placeholder="e.g. Food, Utilities, Transport" 
+                    required
+                    style="width: 100%;"
+                >
+            </div>
+
+            <div style="display: flex; gap: 12px; margin-top: 10px; justify-content: flex-end;">
+                <a href="/" class="btn red" style="margin: 0;">Cancel</a>
+                <button type="submit" class="btn green" style="margin: 0;">Add Expense</button>
+            </div>
+
+        </form>
+
+    </div>
+
+</div>
+
+</body>
+</html>

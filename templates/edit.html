@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Expense</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<div class="container">
+
+    <h1>✏️ Edit Expense</h1>
+
+    <div class="card" style="width: 100%; max-width: 500px; margin-top: 10px;">
+        
+        <form method="POST" style="display: flex; flex-direction: column; gap: 20px;">
+
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+                <label style="font-size: 13px; font-weight: 600; color: #a78bfa; text-transform: uppercase; letter-spacing: 0.03em;">
+                    Item Description
+                </label>
+                <input 
+                    type="text" 
+                    name="name" 
+                    value="{{ expense[0] }}" 
+                    placeholder="e.g. Groceries, Internet Bill"
+                    required
+                    style="width: 100%;"
+                >
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+                <label style="font-size: 13px; font-weight: 600; color: #a78bfa; text-transform: uppercase; letter-spacing: 0.03em;">
+                    Amount (₹)
+                </label>
+                <input 
+                    type="number" 
+                    name="amount" 
+                    value="{{ expense[1] }}" 
+                    placeholder="Enter amount"
+                    step="0.01"
+                    required
+                    style="width: 100%;"
+                >
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+                <label style="font-size: 13px; font-weight: 600; color: #a78bfa; text-transform: uppercase; letter-spacing: 0.03em;">
+                    Category
+                </label>
+                <input 
+                    type="text" 
+                    name="category" 
+                    value="{{ expense[2] }}" 
+                    placeholder="e.g. Food, Utilities, Entertainment"
+                    required
+                    style="width: 100%;"
+                >
+            </div>
+
+            <div style="display: flex; gap: 12px; margin-top: 10px; justify-content: flex-end;">
+                <a href="/expenses" class="btn red" style="margin: 0;">Cancel</a>
+                <button type="submit" class="btn green" style="margin: 0;">Save Changes</button>
+            </div>
+
+        </form>
+
+    </div>
+
+</div>
+
+</body>
+</html>

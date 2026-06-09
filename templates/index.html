@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Expense Tracker Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+<div class="container">
+
+    <h1>💰 Expense Tracker</h1>
+
+    <div class="top-actions" style="margin-bottom: 30px;">
+        <a href="/add" class="btn green">➕ Add Expense</a>
+        <a href="/delete" class="btn red">🗑 Delete Expense</a>
+        
+        <a href="/export-csv" class="btn" style="background: rgba(167, 139, 250, 0.12); border-color: rgba(167, 139, 250, 0.3);">
+            📥 Export Full History
+        </a>
+        
+        <a href="/export-monthly-csv" class="btn" style="background: rgba(6, 182, 212, 0.12); border-color: rgba(6, 182, 212, 0.3); color: #22d3ee;">
+            📅 Export This Month
+        </a>
+    </div>
+    
+    <a href="/expenses" style="text-decoration: none; display: block; margin: 15px 0 25px 0;">
+        <div class="card" style="
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            padding: 14px; 
+            background: rgba(167, 139, 250, 0.05); 
+            border: 1px solid rgba(167, 139, 250, 0.15); 
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;">
+            
+            <span style="color: #c084fc; font-size: 14px; font-weight: 600; letter-spacing: 0.02em;">
+                🔍 View Full Ledger & Edit Expenses →
+            </span>
+            
+        </div>
+    </a>
+
+    <div class="stats">
+        <div class="card">
+            <h3>Total Outflow</h3>
+            <h2>₹{{ "%.2f"|format(total_expense) }}</h2>
+        </div>
+        <div class="card">
+            <h3>Transactions</h3>
+            <h2>{{ count }}</h2>
+        </div>
+        <div class="card">
+            <h3>Highest Single Spend</h3>
+            <h2>₹{{ "%.2f"|format(highest_expense) }}</h2>
+        </div>
+    </div>
+
+    <a href="/insights" style="text-decoration: none; display: block; margin-bottom: 24px;">
+        <div class="card" style="text-align: center; gap: 8px;">
+            <h3>🧠 Smart Insights</h3>
+            <h2 style="font-size: 20px; font-weight: 500;">{{ insight }}</h2>
+            <span style="font-size: 13px; color: #a78bfa; opacity: 0.8; margin-top: 4px; display: inline-block;">
+                Click to view detailed analysis & health score →
+            </span>
+        </div>
+    </a>
+
+    <a href="/upcoming" style="text-decoration: none; display: block; margin-bottom: 32px;">
+        <div class="card" style="text-align: center; gap: 4px;">
+            <h3>📅 Upcoming Commitments</h3>
+            <h2 style="font-size: 18px; font-weight: 500; color: #cbd5e1;">Manage EMIs, Bills, & Savings Goals</h2>
+        </div>
+    </a>
+
+    <div class="top-actions">
+        <button class="btn green" onclick="filterCategory('all')">All Categories</button>
+        {% for c in categories %}
+        <button class="btn" onclick="filterCategory('{{ c }}')">{{ c }}</button>
+        {% endfor %}
+    </div>
+
+    <div class="table-container" style="width: 100%;">
+        
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 12px; margin-bottom: 24px;">
+            <h3 style="font-size: 14px; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; margin: 0;">
+                📊 Spending Distribution
+            </h3>
+            
+            <div style="display: flex; gap: 8px; background: rgba(0,0,0,0.2); padding: 4px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+                <button id="toggleDoughnut" class="btn" style="padding: 4px 10px; font-size: 11px; margin: 0; background: #6366f1;" onclick="switchChartType('doughnut')">Doughnut</button>
+                <button id="togglePie" class="btn" style="padding: 4px 10px; font-size: 11px; margin: 0; background: transparent;" onclick="switchChartType('pie')">Pie Chart</button>
+            </div>
+        </div>
+
+        <div class="chart-box">
+            <canvas id="expenseChart"></canvas>
+        </div>
+    </div>
+
+    <div class="table-container" style="width: 100%; margin-top: 30px; margin-bottom: 40px;">
+        <h3 style="font-size: 14px; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; margin: 0; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 12px; margin-bottom: 24px;">
+            📈 Daily Outflow Velocity — {{ current_month }}
+        </h3>
+        
+        <div style="height: 260px; position: relative;">
+            <canvas id="trendTimelineChart"></canvas>
+        </div>
+    </div>
+
+</div> <script>
+const ctx = document.getElementById('expenseChart').getContext('2d');
+
+let currentCategories = {{ categories | tojson }};
+let currentValues = {{ values | tojson }};
+let allExpenses = {{ expenses | tojson }};
+
+const chartColors = [
+    '#6366f1', // Indigo
+    '#22c55e', // Emerald
+    '#eab308', // Amber
+    '#ef4444', // Rose
+    '#06b6d4', // Cyan
+    '#a855f7'  // Purple
+];
+
+let currentChartType = 'doughnut';
+let expenseChart;
+
+function buildChartEngine(type) {
+    if (expenseChart) {
+        expenseChart.destroy();
+    }
+
+    expenseChart = new Chart(ctx, {
+        type: type,
+        data: {
+            labels: currentCategories,
+            datasets: [{
+                data: currentValues,
+                backgroundColor: chartColors,
+                borderWidth: 2,
+                borderColor: '#111827',
+                hoverOffset: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: type === 'doughnut' ? '72%' : '0%', 
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        color: '#94a3b8',
+                        font: { family: 'Inter, system-ui, sans-serif', size: 12, weight: '500' },
+                        padding: 20
+                    }
+                }
+            }
+        }
+    });
+}
+
+function switchChartType(selectedType) {
+    currentChartType = selectedType;
+    const btnDoughnut = document.getElementById('toggleDoughnut');
+    const btnPie = document.getElementById('togglePie');
+    
+    if (selectedType === 'doughnut') {
+        btnDoughnut.style.background = '#6366f1';
+        btnPie.style.background = 'transparent';
+    } else {
+        btnDoughnut.style.background = 'transparent';
+        btnPie.style.background = '#6366f1';
+    }
+    buildChartEngine(selectedType);
+}
+
+function filterCategory(category) {
+    let filtered = allExpenses;
+    if (category !== "all") {
+        filtered = allExpenses.filter(e => e.category === category);
+    }
+
+    const grouped = {};
+    filtered.forEach(e => {
+        grouped[e.category] = (grouped[e.category] || 0) + e.amount;
+    });
+
+    const baseCategories = {{ categories | tojson }};
+    const dynamicPalette = Object.keys(grouped).map(catName => {
+        const matchingIndex = baseCategories.indexOf(catName);
+        return matchingIndex !== -1 ? chartColors[matchingIndex % chartColors.length] : '#94a3b8';
+    });
+
+    currentCategories = Object.keys(grouped);
+    currentValues = Object.values(grouped);
+
+    expenseChart.data.labels = currentCategories;
+    expenseChart.data.datasets[0].data = currentValues;
+    expenseChart.data.datasets[0].backgroundColor = dynamicPalette;
+    expenseChart.update();
+}
+
+buildChartEngine(currentChartType);
+</script>
+
+<script>
+const trendCtx = document.getElementById('trendTimelineChart').getContext('2d');
+
+new Chart(trendCtx, {
+    type: 'bar',
+    data: {
+        labels: {{ daily_labels | tojson }},
+        datasets: [{
+            label: 'Daily Sum',
+            data: {{ daily_amounts | tojson }},
+            backgroundColor: 'rgba(167, 139, 250, 0.25)', 
+            borderColor: '#a78bfa',                     
+            borderWidth: 2,
+            borderRadius: 6,                            
+            hoverBackgroundColor: '#c084fc'
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { display: false } 
+        },
+        scales: {
+            x: {
+                grid: { display: false },
+                ticks: {
+                    color: '#94a3b8',
+                    font: { family: 'Inter, system-ui, sans-serif', size: 11 }
+                }
+            },
+            y: {
+                beginAtZero: true,
+                grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                ticks: {
+                    color: '#94a3b8',
+                    font: { family: 'Inter, system-ui, sans-serif', size: 11 },
+                    callback: function(value) { return '₹' + value; }
+                }
+            }
+        }
+    }
+});
+</script>
+
+</body>
+</html>

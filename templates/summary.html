@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Expense Summary</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<div class="container">
+
+    <h1>📊 Expense Summary</h1>
+
+    <div class="top-actions">
+        <a href="/" class="btn red">← Back to Dashboard</a>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 20px; width: 100%; max-width: 600px; margin-top: 10px;">
+
+        <div class="card" style="text-align: center;">
+            <h3>💰 Total Outflow</h3>
+            <h2>₹{{ "%.2f"|format(total|float) }}</h2>
+        </div>
+
+        <div class="card" style="text-align: center;">
+            <h3>📌 Total Transactions</h3>
+            <h2>{{ count }}</h2>
+        </div>
+
+        <div class="card" style="text-align: center;">
+            <h3>📊 Average Expense</h3>
+            <h2>₹{{ "%.2f"|format(avg|float) }}</h2>
+        </div>
+
+    </div>
+
+</div>
+
+</body>
+</html>

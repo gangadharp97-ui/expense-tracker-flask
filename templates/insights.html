@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Insights</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+<div class="container">
+
+    <h1>🧠 Smart Insights</h1>
+
+    <div class="top-actions">
+        <a href="/" class="btn green">← Dashboard</a>
+    </div>
+
+    <div class="card" style="width:100%; text-align:center; margin-top:20px;">
+        <h3>💎 Financial Health Score</h3>
+        <h2 style="font-size:60px;">{{ score }}/100</h2>
+        {% if score >= 80 %}
+            <p>Excellent Financial Discipline</p>
+        {% elif score >= 60 %}
+            <p>Good Spending Control</p>
+        {% else %}
+            <p>Needs Better Budgeting</p>
+        {% endif %}
+    </div>
+
+    <div class="card" style="width:100%; margin-top:20px;">
+        <h3>📊 Expense Overview</h3>
+        <p><strong>Total Spending:</strong> ₹{{ total }}</p>
+        <p><strong>Total Transactions:</strong> {{ count }}</p>
+        <p><strong>Average Expense:</strong> ₹{{ avg }}</p>
+        <p><strong>Highest Expense:</strong> ₹{{ highest }}</p>
+    </div>
+
+    <div class="card" style="width:100%; margin-top:20px;">
+        <h3>🎯 Monthly Budget Tracker</h3>
+        <p><strong>Budget:</strong> ₹{{ monthly_budget }}</p>
+        <p><strong>Spent:</strong> ₹{{ total }}</p>
+        <p><strong>Remaining:</strong> ₹{{ remaining_budget }}</p>
+
+        <form action="/set-budget" method="POST" style="margin-top: 15px; margin-bottom: 15px;">
+            <input type="number" name="budget" placeholder="Enter Monthly Budget" required>
+            <button type="submit" class="btn green">Save Budget</button>
+        </form>
+
+        <div class="progress-bar">
+            <div class="progress-fill" style="width: {{ budget_used if budget_used <= 100 else 100 }}%;"></div>
+        </div>
+        <p style="margin-top: 10px;">{{ budget_used }}% Used</p>
+    </div>
+
+    <div class="card" style="width:100%; margin-top:20px;">
+        <h3>🔮 Expense Forecast</h3>
+        <p>Estimated Future Spending: <strong>₹{{ forecast }}</strong></p>
+        <p>Risk Level: <strong>{{ risk }}</strong></p>
+
+        {% if risk == "High" %}
+            <p>⚠️ Current spending trend may exceed your budget.</p>
+        {% elif risk == "Medium" %}
+            <p>📊 Spending is approaching your budget limit.</p>
+        {% else %}
+            <p>✅ Spending is comfortably within budget.</p>
+        {% endif %}
+    </div>
+
+    <div class="card" style="width:100%; margin-top:20px;">
+        <h3>🎯 Savings Goal Tracker</h3>
+        <form action="/set-goal" method="POST" style="margin-bottom: 15px;">
+            <input type="number" name="goal" placeholder="Enter Savings Goal" required>
+            <button type="submit" class="btn">Save Goal</button>
+        </form>
+
+        <p><strong>Goal Amount:</strong> ₹{{ goal_amount }}</p>
+        <p><strong>Current Savings:</strong> ₹{{ saved_amount }}</p>
+        <p><strong>Remaining:</strong> ₹{{ remaining_goal }}</p>
+
+        <div class="progress-bar">
+            <div class="progress-fill" style="width: {{ goal_progress if goal_progress <= 100 else 100 }}%;"></div>
+        </div>
+        <p style="margin-top:10px;">{{ goal_progress }}% Completed</p>
+    </div>
+
+    <div class="card" style="width:100%; margin-top:20px; text-align:center;">
+        <h3>🏆 Top Spending Category</h3>
+        <h2>{{ top_category if top_category else "None" }}</h2>
+        <p>Total Spent: ₹{{ top_amount }}</p>
+    </div>
+
+    <div class="card" style="width:100%; margin-top:20px;">
+        <h3>💰 Savings Opportunity</h3>
+        <p>
+            If you reduce spending in <strong>{{ top_category if top_category else "your top category" }}</strong> by just 10%, you could save <strong>₹{{ potential_saving }}</strong>.
+        </p>
+    </div>
+
+    <div class="card" style="width:100%; margin-top:20px;">
+        <h3>📈 Monthly Spending Trend</h3>
+        <div style="height:350px; position: relative; margin-top: 15px;">
+            <canvas id="trendChart"></canvas>
+        </div>
+    </div>
+
+    <div class="card" style="width: 100%; margin-top: 20px;">
+        <h3 style="margin-bottom: 15px;">🔍 Filter & Sort Transactions</h3>
+        
+        <div style="display: flex; gap: 15px; flex-wrap: wrap; width: 100%;">
+            <div style="flex: 2; min-width: 200px;">
+                <input type="text" id="searchInput" placeholder="Search by name..." style="width: 100%;" oninput="processLedgerEngine()">
+            </div>
+
+            <div style="flex: 1; min-width: 150px;">
+                <select id="categoryFilter" style="width: 100%;" onchange="processLedgerEngine()">
+                    <option value="all">All Categories</option>
+                </select>
+            </div>
+
+            <div style="flex: 1; min-width: 180px;">
+                <select id="sortEngine" style="width: 100%;" onchange="processLedgerEngine()">
+                    <option value="date-desc">Sort by: Latest Date</option>
+                    <option value="date-asc">Sort by: Oldest Date</option>
+                    <option value="amount-desc">Sort by: Amount (High → Low)</option>
+                    <option value="amount-asc">Sort by: Amount (Low → High)</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <div class="table-container" style="width:100%; margin-top:20px;">
+        <h3>🧾 Recent Transactions Ledger</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Amount</th>
+                    <th>Category</th>
+                    <th>Date</th>
+                </tr>
+            </thead>
+            <tbody id="ledgerTableBody">
+                </tbody>
+        </table>
+    </div>
+
+    <div class="card" style="width:100%; margin-top:20px; margin-bottom: 40px;">
+        <h3>🤖 AI Summary</h3>
+        <div style="margin-top: 10px;">
+            {% for item in insights %}
+                <p style="margin-bottom: 8px;">• {{ item }}</p>
+            {% endfor %}
+        </div>
+    </div>
+
+</div>
+
+<script>
+const trendCtx = document.getElementById("trendChart").getContext("2d");
+
+new Chart(trendCtx, {
+    type: "line",
+    data: {
+        labels: {{ months | tojson }},
+        datasets: [{
+            label: "Monthly Expenses",
+            data: {{ monthly_totals | tojson }},
+            tension: 0.4,
+            fill: true,
+            borderWidth: 3,
+            backgroundColor: "rgba(168, 85, 247, 0.15)",
+            borderColor: "#a855f7"
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                display: false
+            }
+        },
+        scales: {
+            x: {
+                ticks: { color: '#c4b5fd' },
+                grid: { display: false }
+            },
+            y: {
+                ticks: { color: '#c4b5fd' },
+                grid: { color: 'rgba(167, 139, 250, 0.12)' }
+            }
+        }
+    }
+});
+</script>
+
+<script>
+// 1. Build master dataset from Flask variables
+const masterLedger = [
+    {% for t in recent_transactions %}
+    {
+        name: {{ t.name | tojson }},
+        amount: parseFloat({{ t.amount }}),
+        category: {{ t.category | tojson }},
+        date: {{ t.date | tojson }}
+    },
+    {% endfor %}
+];
+
+// 2. Extract unique categories dynamically to auto-fill menu
+function setupCategoryDropdown() {
+    const dropdown = document.getElementById('categoryFilter');
+    const categoriesSet = new Set(masterLedger.map(item => item.category));
+    
+    categoriesSet.forEach(cat => {
+        if(cat) {
+            const opt = document.createElement('option');
+            opt.value = cat;
+            opt.innerText = cat;
+            dropdown.appendChild(opt);
+        }
+    });
+}
+
+// 3. Filtering computation method
+function processLedgerEngine() {
+    const searchQuery = document.getElementById('searchInput').value.toLowerCase().trim();
+    const selectedCategory = document.getElementById('categoryFilter').value;
+    const sortingStrategy = document.getElementById('sortEngine').value;
+    const tableBody = document.getElementById('ledgerTableBody');
+
+    let filteredData = masterLedger.filter(item => {
+        const matchesSearch = item.name.toLowerCase().includes(searchQuery);
+        const matchesCategory = (selectedCategory === 'all' || item.category === selectedCategory);
+        return matchesSearch && matchesCategory;
+    });
+
+    if (sortingStrategy === 'amount-desc') {
+        filteredData.sort((a, b) => b.amount - a.amount);
+    } else if (sortingStrategy === 'amount-asc') {
+        filteredData.sort((a, b) => a.amount - b.amount);
+    } else if (sortingStrategy === 'date-desc') {
+        filteredData.sort((a, b) => new Date(b.date) - new Date(a.date));
+    } else if (sortingStrategy === 'date-asc') {
+        filteredData.sort((a, b) => new Date(a.date) - new Date(b.date));
+    }
+
+    tableBody.innerHTML = '';
+
+    if (filteredData.length === 0) {
+        tableBody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: #94a3b8; padding: 24px;">No matching records found.</td></tr>`;
+        return;
+    }
+
+    filteredData.forEach(item => {
+        const rowHTML = `
+            <tr>
+                <td>${item.name}</td>
+                <td>₹${item.amount.toFixed(2)}</td>
+                <td><span class="badge" style="background: rgba(255,255,255,0.05);">${item.category}</span></td>
+                <td>${item.date}</td>
+            </tr>
+        `;
+        tableBody.insertAdjacentHTML('beforeend', rowHTML);
+    });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    setupCategoryDropdown();
+    processLedgerEngine();
+});
+</script>
+
+</body>
+</html>
