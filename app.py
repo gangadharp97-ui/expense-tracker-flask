@@ -39,6 +39,18 @@ def init_db():
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         )
     ''')
+
+    # 3. Create Reminders Table linked to Users
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS reminders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            title TEXT NOT NULL,
+            amount REAL NOT NULL,
+            date TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+    ''')
     
     conn.commit()
     conn.close()
@@ -328,7 +340,6 @@ def delete():
     if request.method == "POST":
         try:
             target_id = int(request.form["index"])
-            # Ensure the row belongs to the current user before running deletion
             cursor.execute("DELETE FROM expenses WHERE id = ? AND user_id = ?", (target_id, user_id))
             conn.commit()
         except:
@@ -339,7 +350,6 @@ def delete():
     user_rows = cursor.fetchall()
     conn.close()
 
-    # Pass rows to the view layout
     display_rows = [[row[0], [row[1], row[2], row[3], row[4]]] for row in user_rows]
 
     return render_template("delete.html", rows=display_rows)
@@ -360,9 +370,8 @@ def expenses_page():
     rows = cursor.fetchall()
     conn.close()
 
-    # Formatted explicitly to feed your JavaScript ledger filter script engine safely
     expenses_list = [[row[0], [row[1], row[2], row[3], row[4]]] for row in rows]
-    categories = sorted(list(set(row[2].strip() for row in rows if len(row) >= 3)))
+    categories = sorted(list(set(row[3].strip() for row in rows if len(row) >= 4)))
 
     return render_template("expenses.html", expenses=expenses_list, categories=categories)
 
@@ -454,16 +463,114 @@ def export_monthly_csv():
 
 
 # --------------------------------------------------------------------------
-# LEGACY FALLBACK STATIC ENDPOINTS (PRESERVED)
+# USER TRACKING PREFERENCE SETTING INPUT MANIPULATORS
+# --------------------------------------------------------------------------
+@app.route("/set-budget", methods=["POST"])
+def set_budget():
+    user_id = get_current_user()
+    if not user_id:
+        return redirect(url_for("login"))
+
+    raw_budget = request.form.get("budget", "0").strip()
+    try:
+        budget_value = float(raw_budget)
+    except ValueError:
+        budget_value = 20000.0
+
+    with open(f"budget_{user_id}.txt", "w") as f:
+        f.write(str(budget_value))
+
+    return redirect(url_for("insights"))
+
+
+@app.route("/set-goal", methods=["POST"])
+def set_goal():
+    user_id = get_current_user()
+    if not user_id:
+        return redirect(url_for("login"))
+
+    raw_goal = request.form.get("goal", "0").strip()
+    try:
+        goal_value = float(raw_goal)
+    except ValueError:
+        goal_value = 50000.0
+
+    with open(f"goal_{user_id}.txt", "w") as f:
+        f.write(str(goal_value))
+
+    return redirect(url_for("insights"))
+
+
+# --------------------------------------------------------------------------
+# UPCOMING REMINDERS & ADD REMINDER CONTROLLERS (DATABASE CONNECTED)
 # --------------------------------------------------------------------------
 @app.route("/upcoming")
-def upcoming(): return render_template("upcoming.html", reminders=[])
+def upcoming():
+    user_id = get_current_user()
+    if not user_id:
+        return redirect(url_for("login"))
+
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("SELECT title, amount, date FROM reminders WHERE user_id = ?", (user_id,))
+    reminders = cursor.fetchall()
+    conn.close()
+
+    today = datetime.today().date()
+    processed = []
+
+    for row in reminders:
+        try:
+            title = row[0]
+            amount = float(row[1])
+            date_str = row[2]
+
+            due_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+            diff = (due_date - today).days
+
+            if diff == 0:
+                status = "Due Today"
+                status_class = "danger"
+            elif diff < 0:
+                status = "Overdue"
+                status_class = "danger"
+            elif diff <= 3:
+                status = f"Due in {diff} days"
+                status_class = "warning"
+            else:
+                status = f"Due in {diff} days"
+                status_class = "success"
+
+            processed.append([title, amount, date_str, status, status_class])
+        except:
+            continue
+
+    return render_template("upcoming.html", reminders=processed)
+
+
 @app.route("/add-reminder", methods=["GET", "POST"])
-def add_reminder(): return redirect(url_for("upcoming"))
-@app.route("/set-budget", methods=["POST"])
-def set_budget(): return redirect(url_for("insights"))
-@app.route("/set-goal", methods=["POST"])
-def set_goal(): return redirect(url_for("insights"))
+def add_reminder():
+    user_id = get_current_user()
+    if not user_id:
+        return redirect(url_for("login"))
+
+    if request.method == "POST":
+        title = request.form["title"]
+        amount = float(request.form["amount"])
+        date = request.form["date"]
+
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO reminders (user_id, title, amount, date) VALUES (?, ?, ?, ?)",
+            (user_id, title, amount, date)
+        )
+        conn.commit()
+        conn.close()
+
+        return redirect(url_for("upcoming"))
+
+    return render_template("add_reminder.html")
 
 
 if __name__ == "__main__":
