@@ -6,17 +6,20 @@ from collections import defaultdict
 from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
-app.secret_key = 'your_super_secret_key_here'  # Required to run secure user login sessions
+app.secret_key = 'your_super_secret_key_here'  # In production, consider loading this from an env var
 
 DB_FILE = "tracker.db"
 
 # --------------------------------------------------------------------------
-# DATABASE INITIALIZATION ENGINE
+# DATABASE INITIALIZATION ENGINE (Upgraded with Profiles Table)
 # --------------------------------------------------------------------------
 def init_db():
     """Initializes the SQLite database and creates structural tracking tables."""
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
+    
+    # Enable foreign keys support in SQLite
+    cursor.execute("PRAGMA foreign_keys = ON;")
     
     # 1. Create Users Table
     cursor.execute('''
@@ -27,7 +30,17 @@ def init_db():
         )
     ''')
     
-    # 2. Create Expenses Table linked to Users
+    # 2. Create User Profiles Table (Prevents data loss on Render ephemeral instances)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS user_profiles (
+            user_id INTEGER PRIMARY KEY,
+            monthly_budget REAL DEFAULT 20000.0,
+            goal_amount REAL DEFAULT 50000.0,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+    ''')
+    
+    # 3. Create Expenses Table linked to Users
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS expenses (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -40,7 +53,7 @@ def init_db():
         )
     ''')
 
-    # 3. Create Reminders Table linked to Users
+    # 4. Create Reminders Table linked to Users
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS reminders (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -60,11 +73,16 @@ init_db()
 
 
 # --------------------------------------------------------------------------
-# SECURE ROUTE PROTECTION SHIELD
+# HELPERS & PRODUCTION TIMEZONE LOCKS
 # --------------------------------------------------------------------------
 def get_current_user():
     """Helper to fetch logged-in user ID from browser session context."""
     return session.get('user_id')
+
+def get_ist_date():
+    """Returns the current date string strictly locked to Indian Standard Time (IST)."""
+    import zoneinfo
+    return datetime.now(zoneinfo.ZoneInfo("Asia/Kolkata")).strftime("%Y-%m-%d")
 
 
 # --------------------------------------------------------------------------
@@ -85,6 +103,9 @@ def register():
         cursor = conn.cursor()
         try:
             cursor.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, hashed_password))
+            # Fetch the new user's ID to initialize their profile record
+            user_id = cursor.lastrowid
+            cursor.execute("INSERT OR IGNORE INTO user_profiles (user_id) VALUES (?)", (user_id,))
             conn.commit()
             return redirect(url_for("login"))
         except sqlite3.IntegrityError:
@@ -105,6 +126,12 @@ def login():
         cursor = conn.cursor()
         cursor.execute("SELECT id, password FROM users WHERE username = ?", (username,))
         user_record = cursor.fetchone()
+        
+        if user_record:
+            # Sync check: ensure a profile entry exists for old profiles
+            cursor.execute("INSERT OR IGNORE INTO user_profiles (user_id) VALUES (?)", (user_record[0],))
+            conn.commit()
+            
         conn.close()
         
         if user_record and check_password_hash(user_record[1], password):
@@ -141,10 +168,10 @@ def index():
     current_month_str = datetime.now().strftime("%Y-%m")
     daily_raw_map = defaultdict(float)
 
-    # Fetch expenses belonging only to this logged-in account
+    # Fetch expenses sorted newest first by database ID configuration
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
-    cursor.execute("SELECT name, amount, category, date FROM expenses WHERE user_id = ?", (user_id,))
+    cursor.execute("SELECT name, amount, category, date FROM expenses WHERE user_id = ? ORDER BY id DESC", (user_id,))
     rows = cursor.fetchall()
     conn.close()
 
@@ -154,7 +181,8 @@ def index():
         total_expense += amt
         count += 1
         if amt > highest_expense:
-            highest_expense = amt
+            box_amt = amt
+            highest_expense = box_amt
         
         expenses_list.append({"name": name, "amount": amt, "category": cat, "date": dt})
         category_totals[cat] += amt
@@ -195,7 +223,7 @@ def index():
 
 
 # --------------------------------------------------------------------------
-# 🧠 SMART INSIGHTS
+# 🧠 SMART INSIGHTS (Fixed Synchronization Engine)
 # --------------------------------------------------------------------------
 @app.route("/insights")
 def insights():
@@ -205,11 +233,26 @@ def insights():
 
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
-    cursor.execute("SELECT name, amount, category, date FROM expenses WHERE user_id = ?", (user_id,))
+    
+    # 1. Fetch all expenses for calculation metrics
+    cursor.execute("SELECT name, amount, category, date FROM expenses WHERE user_id = ? ORDER BY id DESC", (user_id,))
     rows = cursor.fetchall()
+    
+    # 2. Fetch recent transactions accurately matching SQL insert order priority
+    cursor.execute("SELECT name, amount, category, date FROM expenses WHERE user_id = ? ORDER BY id DESC LIMIT 5", (user_id,))
+    recent_rows = cursor.fetchall()
+    
+    # 3. Fetch user budget parameters safely from database layer
+    cursor.execute("SELECT monthly_budget, goal_amount FROM user_profiles WHERE user_id = ?", (user_id,))
+    profile = cursor.fetchone()
     conn.close()
 
+    # Fallbacks if registration script alignment is bypassed
+    monthly_budget = profile[0] if profile else 20000.0
+    goal_amount = profile[1] if profile else 50000.0
+
     expenses = [{"name": r[0], "amount": float(r[1]), "category": r[2], "date": r[3]} for r in rows]
+    recent_transactions = [{"name": r[0], "amount": float(r[1]), "category": r[2], "date": r[3]} for r in recent_rows]
 
     total = sum(e["amount"] for e in expenses)
     count = len(expenses)
@@ -255,24 +298,10 @@ def insights():
 
     months = list(monthly_data.keys())
     monthly_totals = list(monthly_data.values())
-    recent_transactions = sorted(expenses, key=lambda x: x["date"], reverse=True)[:5]
-
-    # Quick Local Fallbacks for User Settings Parameters
-    monthly_budget = 20000
-    if os.path.exists(f"budget_{user_id}.txt"):
-        try:
-            with open(f"budget_{user_id}.txt", "r") as f: monthly_budget = float(f.read())
-        except: pass
 
     budget_used = round((total / monthly_budget) * 100, 1) if monthly_budget > 0 else 0
     remaining_budget = max(monthly_budget - total, 0)
     
-    goal_amount = 50000
-    if os.path.exists(f"goal_{user_id}.txt"):
-        try:
-            with open(f"goal_{user_id}.txt", "r") as f: goal_amount = float(f.read())
-        except: pass
-
     saved_amount = max(monthly_budget - total, 0)
     goal_progress = min(round((saved_amount / goal_amount) * 100, 1) if goal_amount > 0 else 0, 100)
     remaining_goal = max(goal_amount - saved_amount, 0)
@@ -297,7 +326,7 @@ def insights():
 
 
 # --------------------------------------------------------------------------
-# ADD EXPENSE
+# ADD EXPENSE (With IST Timezone Safeguard)
 # --------------------------------------------------------------------------
 @app.route("/add", methods=["GET", "POST"])
 def add():
@@ -309,7 +338,7 @@ def add():
         name = request.form["name"]
         amount = float(request.form["amount"])
         category = request.form["category"]
-        date = datetime.now().strftime("%Y-%m-%d")
+        date = get_ist_date()  # Production Fix: Always tags input to Indian timezone data context
 
         conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
@@ -346,7 +375,7 @@ def delete():
             pass
         return redirect(url_for("index"))
 
-    cursor.execute("SELECT id, name, amount, category, date FROM expenses WHERE user_id = ?", (user_id,))
+    cursor.execute("SELECT id, name, amount, category, date FROM expenses WHERE user_id = ? ORDER BY id DESC", (user_id,))
     user_rows = cursor.fetchall()
     conn.close()
 
@@ -366,7 +395,7 @@ def expenses_page():
 
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
-    cursor.execute("SELECT id, name, amount, category, date FROM expenses WHERE user_id = ?", (user_id,))
+    cursor.execute("SELECT id, name, amount, category, date FROM expenses WHERE user_id = ? ORDER BY id DESC", (user_id,))
     rows = cursor.fetchall()
     conn.close()
 
@@ -417,7 +446,7 @@ def export_csv():
 
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
-    cursor.execute("SELECT name, amount, category, date FROM expenses WHERE user_id = ?", (user_id,))
+    cursor.execute("SELECT name, amount, category, date FROM expenses WHERE user_id = ? ORDER BY id DESC", (user_id,))
     expenses = cursor.fetchall()
     conn.close()
 
@@ -427,7 +456,7 @@ def export_csv():
             name = f'"{row[0]}"' if ',' in row[0] else row[0]
             yield f"{name},{row[1]},{row[2]},{row[3]}\n"
 
-    current_date = datetime.now().strftime("%Y-%m-%d")
+    current_date = get_ist_date()
     return Response(
         generate_download_stream(), mimetype="text/csv",
         headers={"Content-Disposition": f"attachment; filename=Ledger_Export_{current_date}.csv"}
@@ -444,7 +473,7 @@ def export_monthly_csv():
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT name, amount, category, date FROM expenses WHERE user_id = ? AND date LIKE ?", 
+        "SELECT name, amount, category, date FROM expenses WHERE user_id = ? AND date LIKE ? ORDER BY id DESC", 
         (user_id, f"{current_month_str}%")
     )
     expenses = cursor.fetchall()
@@ -463,7 +492,7 @@ def export_monthly_csv():
 
 
 # --------------------------------------------------------------------------
-# USER TRACKING PREFERENCE SETTING INPUT MANIPULATORS
+# USER TRACKING PREFERENCE SETTING INPUT MANIPULATORS (Fixed Data Loss Model)
 # --------------------------------------------------------------------------
 @app.route("/set-budget", methods=["POST"])
 def set_budget():
@@ -477,8 +506,14 @@ def set_budget():
     except ValueError:
         budget_value = 20000.0
 
-    with open(f"budget_{user_id}.txt", "w") as f:
-        f.write(str(budget_value))
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO user_profiles (user_id, monthly_budget) VALUES(?, ?)
+        ON CONFLICT(user_id) DO UPDATE SET monthly_budget = excluded.monthly_budget
+    ''', (user_id, budget_value))
+    conn.commit()
+    conn.close()
 
     return redirect(url_for("insights"))
 
@@ -495,14 +530,20 @@ def set_goal():
     except ValueError:
         goal_value = 50000.0
 
-    with open(f"goal_{user_id}.txt", "w") as f:
-        f.write(str(goal_value))
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO user_profiles (user_id, goal_amount) VALUES(?, ?)
+        ON CONFLICT(user_id) DO UPDATE SET goal_amount = excluded.goal_amount
+    ''', (user_id, goal_value))
+    conn.commit()
+    conn.close()
 
     return redirect(url_for("insights"))
 
 
 # --------------------------------------------------------------------------
-# UPCOMING REMINDERS & ADD REMINDER CONTROLLERS (DATABASE CONNECTED)
+# UPCOMING REMINDERS & ADD REMINDER CONTROLLERS
 # --------------------------------------------------------------------------
 @app.route("/upcoming")
 def upcoming():
@@ -512,11 +553,12 @@ def upcoming():
 
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
-    cursor.execute("SELECT title, amount, date FROM reminders WHERE user_id = ?", (user_id,))
+    cursor.execute("SELECT title, amount, date FROM reminders WHERE user_id = ? ORDER BY date ASC", (user_id,))
     reminders = cursor.fetchall()
     conn.close()
 
-    today = datetime.today().date()
+    # Align due calculations cleanly with local calendar
+    today = datetime.strptime(get_ist_date(), "%Y-%m-%d").date()
     processed = []
 
     for row in reminders:
